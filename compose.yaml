@@ -7,3 +7,10 @@ services:
       - "8092:80"
     volumes:
       - ./public:/usr/share/nginx/html:ro
+    networks:
+      - default
+      - edge
+
+networks:
+  edge:
+    external: true
