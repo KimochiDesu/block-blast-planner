@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>Block Blast Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: board on the left, piece tray on the right, plan strip full width below; stacks on phones. */
+:root {
+  --bg: #EDEFF7; --surface: #FFFFFF; --ink: #1D2142; --muted: #5A6086; --line: #D6DAEB;
+  --board: #2A2E5C; --cell: #373C74; --block: #9198CF; --accent: #4B4FD8; --accent-ink: #FFFFFF;
+  --p1: #FF6B5A; --p2: #22B8AA; --p3: #F5B12E;
+  --good: #1E9E62; --warn: #C98400; --bad: #D4423A;
+  --good-bg: #DDF4E8; --warn-bg: #FBEFD3; --bad-bg: #FBE1DF;
+  --display: "Bungee", "Arial Black", Impact, sans-serif;
+  --body: "Nunito", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12142A; --surface: #1B1E3B; --ink: #E8EAF8; --muted: #9EA3C8; --line: #2E3360;
+  --board: #0C0E24; --cell: #1F2350; --block: #6E76B2; --accent: #8E92FF; --accent-ink: #12142A;
+  --good: #4CD08F; --warn: #F2B544; --bad: #FF7A70;
+  --good-bg: #173A2C; --warn-bg: #3C3018; --bad-bg: #42201F; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #12142A; --surface: #1B1E3B; --ink: #E8EAF8; --muted: #9EA3C8; --line: #2E3360;
+  --board: #0C0E24; --cell: #1F2350; --block: #6E76B2; --accent: #8E92FF; --accent-ink: #12142A;
+  --good: #4CD08F; --warn: #F2B544; --bad: #FF7A70;
+  --good-bg: #173A2C; --warn-bg: #3C3018; --bad-bg: #42201F; color-scheme: dark; }
+
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 20px; }
+header h1 { font-family: var(--display); font-weight: 400; font-size: clamp(26px, 5vw, 38px); line-height: 1.1; margin: 0; text-wrap: balance; }
+header h1 span { color: var(--p1); } header h1 span + span { color: var(--p2); } header h1 span + span + span { color: var(--p3); }
+header p { margin: 6px 0 0; color: var(--muted); max-width: 62ch; }
+.layout { display: grid; gap: 20px; grid-template-columns: 1fr; }
+@media (min-width: 880px) { .layout { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 14px; align-content: start; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; margin: 0; font-weight: 800; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.tag { font-size: 11px; letter-spacing: .04em; background: var(--warn-bg); color: var(--warn); padding: 2px 8px; border-radius: 99px; text-transform: none; }
+.hint { color: var(--muted); font-size: 13px; margin: 0; }
+.btns { display: flex; gap: 6px; flex-wrap: wrap; }
+button { font: inherit; cursor: pointer; }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 6px 12px; border-radius: 10px; font-weight: 700; font-size: 13px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* main board */
+.board { display: grid; grid-template-columns: 18px repeat(8, minmax(0, 1fr)); gap: 5px; width: 100%; max-width: 480px; margin: 0 auto;
+  background: var(--board); padding: 12px 12px 12px 6px; border-radius: 14px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.lbl { font-family: var(--mono); font-size: 11px; color: var(--block); display: grid; place-items: center; }
+.cell { aspect-ratio: 1; border: 0; border-radius: 6px; background: var(--cell); padding: 0; transition: background .08s; }
+.cell.on { background: var(--block); box-shadow: inset 0 -4px 0 rgba(0,0,0,.22), inset 0 3px 0 rgba(255,255,255,.28); }
+.cell:hover { filter: brightness(1.15); }
+.board-foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.board-foot b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* slots */
+.slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.slot { border: 2px solid var(--line); border-radius: 14px; padding: 10px; display: grid; gap: 8px; background: var(--bg); cursor: pointer; }
+.slot.active { border-color: var(--pc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pc) 25%, transparent); }
+.slot-head { display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 13px; }
+.slot-head .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--pc); display: inline-block; margin-right: 6px; }
+.slot-head button { border: 0; background: none; color: var(--muted); font-size: 12px; font-weight: 700; padding: 2px 4px; }
+.pgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.pcell { aspect-ratio: 1; border: 0; border-radius: 4px; background: var(--line); padding: 0; }
+.pcell.on { background: var(--pc); box-shadow: inset 0 -3px 0 rgba(0,0,0,.2), inset 0 2px 0 rgba(255,255,255,.3); }
+.s0 { --pc: var(--p1); } .s1 { --pc: var(--p2); } .s2 { --pc: var(--p3); }
+
+/* library */
+.lib { display: grid; gap: 10px; }
+.lib-group { display: grid; gap: 6px; }
+.lib-group h3 { margin: 0; font-size: 12px; color: var(--muted); font-weight: 700; }
+.lib-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.shape { border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px; display: grid; place-items: center; min-width: 38px; min-height: 38px; }
+.shape:hover { border-color: var(--accent); }
+.mini-shape { display: grid; gap: 2px; }
+.mini-shape i { width: 7px; height: 7px; border-radius: 2px; background: transparent; }
+.mini-shape i.on { background: var(--muted); }
+.shape:hover .mini-shape i.on { background: var(--accent); }
+
+/* results */
+.results { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 16px; min-width: 0; }
+.verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.verdict h2 { color: var(--ink); font-size: 18px; text-transform: none; letter-spacing: 0; }
+.pill { font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 99px; letter-spacing: .03em; text-transform: uppercase; }
+.pill.low { background: var(--good-bg); color: var(--good); }
+.pill.medium { background: var(--warn-bg); color: var(--warn); }
+.pill.high { background: var(--bad-bg); color: var(--bad); }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.stat { border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; font-size: 13px; color: var(--muted); }
+.stat b { color: var(--ink); font-size: 16px; font-variant-numeric: tabular-nums; margin-right: 4px; }
+.tabs { display: flex; gap: 6px; }
+.tab { border: 1px solid var(--line); background: var(--bg); color: var(--muted); border-radius: 99px; padding: 4px 14px; font-weight: 700; font-size: 13px; }
+.tab[aria-selected="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.steps { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.step { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.step-title { display: flex; align-items: center; gap: 10px; }
+.num { font-family: var(--display); font-size: 20px; width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: var(--pc); color: #1D2142; flex: none; }
+.num.end { background: var(--line); color: var(--ink); font-size: 14px; }
+.step-title div { font-size: 13px; line-height: 1.35; }
+.step-title strong { display: block; font-size: 14px; }
+.coord { font-family: var(--mono); font-size: 12px; }
+.mini { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; background: var(--board); padding: 6px; border-radius: 10px; max-width: 260px; width: 100%; }
+.mini i { aspect-ratio: 1; border-radius: 3px; background: var(--cell); position: relative; }
+.mini i.on { background: var(--block); }
+.mini i.pc { background: var(--pc); }
+.mini i.clr::after { content: ""; position: absolute; inset: -1px; border-radius: 3px; background: repeating-linear-gradient(45deg, rgba(255,255,255,.55) 0 2px, transparent 2px 5px); }
+.clears { font-size: 13px; font-weight: 700; }
+.clears.yes { color: var(--good); } .clears.no { color: var(--muted); font-weight: 600; }
+.combo { font-family: var(--display); font-size: 12px; color: var(--p1); margin-left: 6px; }
+.note { font-size: 14px; color: var(--muted); margin: 0; max-width: 70ch; }
+.note b { color: var(--ink); }
+.empty-state { color: var(--muted); padding: 18px 0; }
+.footer-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1><span>Block</span> <span>Blast</span> <span>Planner</span></h1>
+    <p>Mark the filled cells on your board, pick your three pieces, and get the order and spot for each one. The planner looks for line clears, keeps your combo going, and leaves room for big pieces.</p>
+  </header>
+
+  <div class="layout">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Your board <span class="tag" id="exampleTag">Example</span></h2>
+        <div class="btns">
+          <button class="btn" id="btnExample" type="button">Load example</button>
+          <button class="btn" id="btnClear" type="button">Clear board</button>
+        </div>
+      </div>
+      <p class="hint">Tap a cell to fill it. Drag to paint several cells at once.</p>
+      <div class="board" id="board" aria-label="8 by 8 game board"></div>
+      <div class="board-foot"><span>Filled: <b id="fillCount">0</b> / 64</span><span>Current board: <span class="pill low" id="boardThreat">Low risk</span></span></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Your 3 pieces</h2>
+        <button class="btn" id="btnClearPieces" type="button">Clear pieces</button>
+      </div>
+      <p class="hint">Tap a slot to select it, then pick a shape below. You can also draw a shape in the slot's grid.</p>
+      <div class="slots" id="slots"></div>
+      <div class="lib" id="lib"></div>
+    </section>
+  </div>
+
+  <section class="results" id="results" aria-live="polite"></section>
+</div>
+
+<script>
+(() => {
+const COLS = "ABCDEFGH";
+const KEY = "bbp-v1";
+const POP = new Uint8Array(512);
+for (let i = 1; i < 512; i++) POP[i] = POP[i >> 1] + (i & 1);
+
+const EXAMPLE_BOARD = [
+  "........",
+  "........",
+  "#.......",
+  "##....##",
+  "###.####",
+  "###..###",
+  "####.###",
+  "##.#####",
+];
+const EXAMPLE_PIECES = [["#", "#", "#"], ["##", "##"], ["###", "#.."]];
+
+let board = new Array(64).fill(false);
+let slots = [0, 1, 2].map(() => new Array(25).fill(false));
+let active = 0;
+let isExample = false;
+let result = null;
+let view = 0;
+
+// ---------- shapes ----------
+const parse = rows => rows.map(r => [...r].map(ch => ch === "#"));
+const rotate = g => g[0].map((_, c) => g.map(row => row[c]).reverse());
+const mirror = g => g.map(row => [...row].reverse());
+const gkey = g => g.map(r => r.map(x => (x ? 1 : 0)).join("")).join("/");
+function variants(rows, withMirror) {
+  const out = new Map();
+  let bases = [parse(rows)];
+  if (withMirror) bases.push(mirror(bases[0]));
+  for (let g of bases) for (let i = 0; i < 4; i++) { out.set(gkey(g), g); g = rotate(g); }
+  return [...out.values()];
+}
+const LIBRARY = [
+  ["Lines", [...variants(["#"]), ...variants(["##"]), ...variants(["###"]), ...variants(["####"]), ...variants(["#####"])]],
+  ["Squares & blocks", [...variants(["##", "##"]), ...variants(["###", "###"]), ...variants(["###", "###", "###"])]],
+  ["Corners", [...variants(["##", "#."]), ...variants(["###", "#..", "#.."])]],
+  ["L shapes", variants(["#.", "#.", "##"], true)],
+  ["T shapes", variants(["###", ".#."])],
+  ["S & Z", variants([".##", "##."], true)],
+];
+
+function gridToRaw(g) {
+  const raw = new Array(25).fill(false);
+  const h = g.length, w = g[0].length;
+  const r0 = Math.floor((5 - h) / 2), c0 = Math.floor((5 - w) / 2);
+  g.forEach((row, r) => row.forEach((v, c) => { if (v) raw[(r + r0) * 5 + c + c0] = true; }));
+  return raw;
+}
+
+function pieceFrom(raw) {
+  const cells = [];
+  raw.forEach((v, i) => { if (v) cells.push([Math.floor(i / 5), i % 5]); });
+  if (!cells.length) return null;
+  const minR = Math.min(...cells.map(x => x[0])), minC = Math.min(...cells.map(x => x[1]));
+  const h = Math.max(...cells.map(x => x[0])) - minR + 1, w = Math.max(...cells.map(x => x[1])) - minC + 1;
+  const m = new Array(h).fill(0);
+  cells.forEach(([r, c]) => { m[r - minR] |= 1 << (c - minC); });
+  return { h, w, m, n: cells.length, key: m.join(",") };
+}
+
+// ---------- engine ----------
+const rowsOf = b => Array.from({ length: 8 }, (_, r) => { let x = 0; for (let c = 0; c < 8; c++) if (b[r * 8 + c]) x |= 1 << c; return x; });
+
+function fits(rows, p, r, c) {
+  for (let i = 0; i < p.h; i++) if (rows[r + i] & (p.m[i] << c)) return false;
+  return true;
+}
+function place(rows, p, r, c) {
+  const nr = rows.slice();
+  for (let i = 0; i < p.h; i++) nr[r + i] |= p.m[i] << c;
+  let cr = 0, cc = 255;
+  for (let i = 0; i < 8; i++) { if (nr[i] === 255) cr |= 1 << i; cc &= nr[i]; }
+  if (cr || cc) for (let i = 0; i < 8; i++) nr[i] = (cr >> i) & 1 ? 0 : nr[i] & ~cc & 255;
+  return { rows: nr, lines: POP[cr] + POP[cc], cr, cc };
+}
+function canFitAnywhere(rows, p) {
+  for (let r = 0; r <= 8 - p.h; r++) for (let c = 0; c <= 8 - p.w; c++) if (fits(rows, p, r, c)) return true;
+  return false;
+}
+
+function health(rows) {
+  let empty = 0, trans = 0, holes = 0, h5 = false, fit3 = false, v5 = false;
+  const free = rows.map(x => ~x & 255);
+  const f3 = free.map(f => f & (f >> 1) & (f >> 2));
+  for (let i = 0; i < 8; i++) {
+    const row = rows[i], f = free[i];
+    empty += POP[f];
+    const ext = (row << 1) | 0x201;
+    trans += POP[(ext ^ (ext >> 1)) & 0x1ff];
+    const up = i ? rows[i - 1] : 255, dn = i < 7 ? rows[i + 1] : 255;
+    holes += POP[f & (((row << 1) | 1) & 255) & ((row >> 1) | 0x80) & up & dn];
+    if (f & (f >> 1) & (f >> 2) & (f >> 3) & (f >> 4)) h5 = true;
+    if (i < 7) trans += POP[rows[i] ^ rows[i + 1]];
+    if (i < 6 && (f3[i] & f3[i + 1] & f3[i + 2])) fit3 = true;
+    if (i < 4 && (free[i] & free[i + 1] & free[i + 2] & free[i + 3] & free[i + 4])) v5 = true;
+  }
+  trans += POP[free[0]] + POP[free[7]];
+  return { empty, trans, holes, fit3, h5, v5 };
+}
+const healthScore = h => h.empty * 2 - h.trans * 3 - h.holes * 18 + (h.fit3 ? 45 : 0) + (h.h5 ? 18 : 0) + (h.v5 ? 18 : 0);
+function threat(h) {
+  if (h.empty === 64) return "low";
+  if (!h.fit3 && (h.holes >= 3 || h.empty < 24)) return "high";
+  if (!h.fit3 || h.holes >= 2 || h.empty < 28) return "medium";
+  return "low";
+}
+// Clearing lines scores most; each extra clear in the same turn keeps the combo going.
+const stepValue = (lines, clearsSoFar) => (lines ? 100 * lines + 50 * (lines - 1) + 70 * clearsSoFar : 0);
+
+function solve(rows0, pieces) {
+  const orders = [], seen = new Set();
+  (function perm(rest, acc) {
+    if (!rest.length) { const k = acc.map(x => x.p.key).join("|"); if (!seen.has(k)) { seen.add(k); orders.push(acc); } return; }
+    rest.forEach((x, i) => perm(rest.filter((_, j) => j !== i), [...acc, x]));
+  })(pieces, []);
+
+  const byFirst = new Map();
+  let fullFound = false, partial = null;
+  const stack = [];
+  function rec(rows, order, d, val, clears, lastClear) {
+    if (d === order.length) {
+      fullFound = true;
+      const h = health(rows);
+      const total = val + healthScore(h) + (lastClear ? 40 : 0);
+      const s0 = stack[0], k = s0.pi + ":" + s0.r + "," + s0.c;
+      const cur = byFirst.get(k);
+      if (!cur || total > cur.total) byFirst.set(k, { total, steps: stack.map(s => ({ ...s })), health: h, rows, clears, lastClear });
+      return;
+    }
+    const { p, idx } = order[d];
+    let any = false;
+    for (let r = 0; r <= 8 - p.h; r++) for (let c = 0; c <= 8 - p.w; c++) {
+      if (!fits(rows, p, r, c)) continue;
+      any = true;
+      const res = place(rows, p, r, c);
+      stack.push({ pi: idx, r, c, lines: res.lines, cr: res.cr, cc: res.cc, before: rows, after: res.rows, combo: res.lines ? clears + 1 : 0 });
+      rec(res.rows, order, d + 1, val + stepValue(res.lines, clears), clears + (res.lines ? 1 : 0), res.lines > 0);
+      stack.pop();
+    }
+    if (!any && !fullFound) {
+      const h = health(rows), total = val + healthScore(h);
+      if (!partial || d > partial.depth || (d === partial.depth && total > partial.total))
+        partial = { depth: d, total, steps: stack.map(s => ({ ...s })), health: h, rows, stuck: idx, clears, lastClear };
+    }
+  }
+  orders.forEach(o => rec(rows0, o, 0, 0, 0, false));
+  const plans = [...byFirst.values()].sort((a, b) => b.total - a.total);
+  return { plans, partial: plans.length ? null : partial };
+}
+
+// ---------- painting ----------
+function paintable(el, getVal, setVal, after, onDown) {
+  let painting = null;
+  el.addEventListener("pointerdown", e => {
+    const t = e.target.closest("[data-i]");
+    if (onDown) onDown();
+    if (!t || !el.contains(t)) return;
+    e.preventDefault();
+    if (t.hasPointerCapture && t.hasPointerCapture(e.pointerId)) t.releasePointerCapture(e.pointerId);
+    const i = +t.dataset.i;
+    painting = !getVal(i);
+    setVal(i, painting); after();
+  });
+  el.addEventListener("pointermove", e => {
+    if (painting === null) return;
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const t = hit && hit.closest("[data-i]");
+    if (!t || !el.contains(t)) return;
+    const i = +t.dataset.i;
+    if (getVal(i) !== painting) { setVal(i, painting); after(); }
+  });
+  const stop = () => { painting = null; };
+  window.addEventListener("pointerup", stop);
+  window.addEventListener("pointercancel", stop);
+  el.addEventListener("click", e => {
+    if (e.detail !== 0) return; // keyboard activation only; pointer handled above
+    const t = e.target.closest("[data-i]");
+    if (!t) return;
+    if (onDown) onDown();
+    const i = +t.dataset.i;
+    setVal(i, !getVal(i)); after();
+  });
+}
+
+// ---------- build UI ----------
+const boardEl = document.getElementById("board");
+const boardCells = [];
+boardEl.appendChild(document.createElement("span"));
+for (let c = 0; c < 8; c++) { const s = document.createElement("span"); s.className = "lbl"; s.textContent = COLS[c]; boardEl.appendChild(s); }
+for (let r = 0; r < 8; r++) {
+  const s = document.createElement("span"); s.className = "lbl"; s.textContent = r + 1; boardEl.appendChild(s);
+  for (let c = 0; c < 8; c++) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "cell"; b.dataset.i = r * 8 + c;
+    b.setAttribute("aria-label", COLS[c] + (r + 1));
+    boardEl.appendChild(b); boardCells.push(b);
+  }
+}
+paintable(boardEl, i => board[i], (i, v) => { board[i] = v; }, () => { isExample = false; renderBoard(); changed(); });
+
+const slotsEl = document.getElementById("slots");
+const slotCells = [];
+slots.forEach((_, s) => {
+  const card = document.createElement("div");
+  card.className = "slot s" + s;
+  card.innerHTML = `<div class="slot-head"><span><span class="dot"></span>Piece ${s + 1}</span><button type="button" aria-label="Clear piece ${s + 1}">Clear</button></div>`;
+  const g = document.createElement("div");
+  g.className = "pgrid";
+  const cells = [];
+  for (let i = 0; i < 25; i++) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "pcell"; b.dataset.i = i;
+    b.setAttribute("aria-label", `Piece ${s + 1} row ${Math.floor(i / 5) + 1} column ${(i % 5) + 1}`);
+    g.appendChild(b); cells.push(b);
+  }
+  card.appendChild(g);
+  card.addEventListener("click", () => { if (active !== s) { active = s; renderSlots(); } });
+  card.querySelector(".slot-head button").addEventListener("click", e => {
+    e.stopPropagation(); slots[s].fill(false); active = s; isExample = false; renderSlots(); changed();
+  });
+  paintable(g, i => slots[s][i], (i, v) => { slots[s][i] = v; }, () => { isExample = false; renderSlots(); changed(); }, () => { active = s; });
+  slotsEl.appendChild(card);
+  slotCells.push({ card, cells });
+});
+
+const libEl = document.getElementById("lib");
+LIBRARY.forEach(([name, shapes]) => {
+  const grp = document.createElement("div");
+  grp.className = "lib-group";
+  grp.innerHTML = `<h3>${name}</h3>`;
+  const row = document.createElement("div");
+  row.className = "lib-row";
+  shapes.forEach(g => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "shape";
+    b.setAttribute("aria-label", `${name} shape ${g.length} by ${g[0].length}`);
+    const m = document.createElement("div");
+    m.className = "mini-shape";
+    m.style.gridTemplateColumns = `repeat(${g[0].length}, 7px)`;
+    g.forEach(r => r.forEach(v => { const i = document.createElement("i"); if (v) i.className = "on"; m.appendChild(i); }));
+    b.appendChild(m);
+    b.addEventListener("click", () => {
+      slots[active] = gridToRaw(g);
+      isExample = false;
+      const next = [1, 2, 3].map(k => (active + k) % 3).find(k => !slots[k].some(Boolean));
+      active = next === undefined ? (active + 1) % 3 : next;
+      renderSlots(); changed();
+    });
+    row.appendChild(b);
+  });
+  grp.appendChild(row);
+  libEl.appendChild(grp);
+});
+
+// ---------- render ----------
+function setPill(el, level, suffix) {
+  el.className = "pill " + level;
+  el.textContent = { low: "Low", medium: "Medium", high: "High" }[level] + (suffix || " risk");
+}
+function renderBoard() {
+  boardCells.forEach((b, i) => { b.classList.toggle("on", board[i]); b.setAttribute("aria-pressed", board[i]); });
+  document.getElementById("fillCount").textContent = board.filter(Boolean).length;
+  document.getElementById("exampleTag").hidden = !isExample;
+  setPill(document.getElementById("boardThreat"), threat(health(rowsOf(board))));
+}
+function renderSlots() {
+  slotCells.forEach(({ card, cells }, s) => {
+    card.classList.toggle("active", s === active);
+    cells.forEach((b, i) => b.classList.toggle("on", slots[s][i]));
+  });
+}
+
+const rangeTxt = (a, b, f) => (a === b ? f(a) : f(a) + "–" + f(b));
+function clearTxt(st) {
+  const parts = [];
+  for (let i = 0; i < 8; i++) if ((st.cr >> i) & 1) parts.push("row " + (i + 1));
+  for (let i = 0; i < 8; i++) if ((st.cc >> i) & 1) parts.push("column " + COLS[i]);
+  return parts.join(" + ");
+}
+function miniBoard(rows, st, p) {
+  const el = document.createElement("div");
+  el.className = "mini";
+  if (st) el.classList.add("s" + st.pi);
+  for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) {
+    const i = document.createElement("i");
+    const isPc = st && r >= st.r && r < st.r + p.h && c >= st.c && ((p.m[r - st.r] >> (c - st.c)) & 1);
+    if (isPc) i.className = "pc";
+    else if ((rows[r] >> c) & 1) i.className = "on";
+    if (st && (((st.cr >> r) & 1) || ((st.cc >> c) & 1))) i.classList.add("clr");
+    el.appendChild(i);
+  }
+  return el;
+}
+function stepCard(st, n, pieces) {
+  const p = pieces[st.pi];
+  const card = document.createElement("div");
+  card.className = "step s" + st.pi;
+  const where = `rows ${rangeTxt(st.r + 1, st.r + p.h, x => x)}, columns ${rangeTxt(st.c, st.c + p.w - 1, x => COLS[x])}`;
+  card.innerHTML = `<div class="step-title"><span class="num">${n}</span><div><strong>Place piece ${st.pi + 1}</strong><span class="coord">${where}</span></div></div>`;
+  card.appendChild(miniBoard(st.before, st, p));
+  const cl = document.createElement("div");
+  cl.className = "clears " + (st.lines ? "yes" : "no");
+  cl.innerHTML = st.lines ? `Clears ${clearTxt(st)}${st.combo > 1 ? `<span class="combo">Combo ×${st.combo}</span>` : ""}` : "No clear. Sets up the board.";
+  card.appendChild(cl);
+  return card;
+}
+function endCard(rows, label) {
+  const card = document.createElement("div");
+  card.className = "step";
+  card.innerHTML = `<div class="step-title"><span class="num end">END</span><div><strong>${label}</strong><span class="coord">${64 - rows.reduce((a, x) => a + POP[x], 0)} empty cells</span></div></div>`;
+  card.appendChild(miniBoard(rows, null));
+  return card;
+}
+
+function renderResults() {
+  const el = document.getElementById("results");
+  el.innerHTML = "";
+  if (!result) {
+    el.innerHTML = `<h2>Your plan</h2><p class="empty-state">Pick at least one piece and the plan shows up here.</p>`;
+    return;
+  }
+  const { plans, partial, pieces, missing } = result;
+  const plan = plans.length ? plans[Math.min(view, plans.length - 1)] : partial;
+  const lines = plan.steps.reduce((a, s) => a + s.lines, 0);
+  const lvl = threat(plan.health);
+
+  const head = document.createElement("div");
+  head.className = "verdict";
+  if (plans.length) {
+    head.innerHTML = `<h2>${lines ? `${lines} line${lines > 1 ? "s" : ""} cleared${plan.clears > 1 ? ` across ${plan.clears} moves` : ""}` : "No clears this turn. Safest setup shown."}</h2>`;
+  } else {
+    head.innerHTML = `<h2>Deadlock risk</h2><span class="pill high">Game over risk</span>`;
+  }
+  el.appendChild(head);
+
+  if (plans.length) {
+    const stats = document.createElement("div");
+    stats.className = "stats";
+    stats.innerHTML = `
+      <span class="stat"><b>${lines}</b>lines cleared</span>
+      <span class="stat"><b>${plan.clears}</b>clearing move${plan.clears === 1 ? "" : "s"}</span>
+      <span class="stat"><b>${plan.lastClear ? "Yes" : "No"}</b>ends on a clear (combo carries over)</span>
+      <span class="stat">Board after: <span class="pill ${lvl}">${{ low: "Low", medium: "Medium", high: "High" }[lvl]} risk</span></span>`;
+    el.appendChild(stats);
+
+    if (plans.length > 1) {
+      const tabs = document.createElement("div");
+      tabs.className = "tabs"; tabs.setAttribute("role", "tablist");
+      ["Best plan", "Backup plan"].forEach((t, i) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "tab"; b.textContent = t;
+        b.setAttribute("role", "tab"); b.setAttribute("aria-selected", view === i);
+        b.addEventListener("click", () => { view = i; renderResults(); });
+        tabs.appendChild(b);
+      });
+      el.appendChild(tabs);
+    }
+  } else {
+    const p = document.createElement("p");
+    p.className = "note";
+    const nowhere = result.pieces.map((x, i) => (x && !canFitAnywhere(rowsOf(board), x) ? i + 1 : null)).filter(Boolean);
+    p.innerHTML = nowhere.length
+      ? `<b>Piece ${nowhere.join(" and piece ")}</b> ${nowhere.length > 1 ? "don't" : "doesn't"} fit anywhere on this board. The best you can do is place ${plan.depth} of the pieces below and hope the clears open space.`
+      : `Each piece fits on its own, but no order fits all of them. The best order places <b>${plan.depth}</b>, then <b>piece ${plan.stuck + 1}</b> has no room left.`;
+    el.appendChild(p);
+  }
+
+  const steps = document.createElement("div");
+  steps.className = "steps";
+  plan.steps.forEach((st, i) => steps.appendChild(stepCard(st, i + 1, pieces)));
+  const finalRows = plan.steps.length ? plan.steps[plan.steps.length - 1].after : rowsOf(board);
+  steps.appendChild(endCard(finalRows, plans.length ? "After your turn" : "Where you get stuck"));
+  el.appendChild(steps);
+
+  const notes = [];
+  if (plans.length) {
+    const h = plan.health;
+    if (!h.fit3) notes.push("No open 3×3 area is left after this turn. Look for a clear on the next set before placing big blocks.");
+    if (h.holes) notes.push(`${h.holes} single-cell gap${h.holes > 1 ? "s" : ""} will be left. Only a 1×1 piece or a line clear can fill ${h.holes > 1 ? "them" : "it"}.`);
+    if (!h.h5 || !h.v5) notes.push(`A ${!h.h5 && !h.v5 ? "1×5 line won't fit in either direction" : !h.h5 ? "horizontal 1×5 line won't fit" : "vertical 1×5 line won't fit"}.`);
+    if (missing) notes.push(`This plan covers ${3 - missing} piece${3 - missing > 1 ? "s" : ""}. Add the rest for a full-turn plan.`);
+  }
+  if (notes.length) {
+    const n = document.createElement("p");
+    n.className = "note";
+    n.innerHTML = "<b>Watch out:</b> " + notes.join(" ");
+    el.appendChild(n);
+  }
+
+  if (plans.length) {
+    const fa = document.createElement("div");
+    fa.className = "footer-actions";
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "btn primary"; b.textContent = "I played this. Update my board";
+    b.addEventListener("click", () => {
+      for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) board[r * 8 + c] = !!((finalRows[r] >> c) & 1);
+      slots.forEach(s => s.fill(false));
+      active = 0; isExample = false;
+      renderBoard(); renderSlots(); changed();
+      document.getElementById("slots").scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    fa.appendChild(b);
+    const s = document.createElement("span");
+    s.className = "hint";
+    s.textContent = "Sets the board to the end position and clears the pieces so you can enter your next three.";
+    fa.appendChild(s);
+    el.appendChild(fa);
+  }
+}
+
+// ---------- flow ----------
+let timer = null;
+function changed() {
+  try { localStorage.setItem(KEY, JSON.stringify({ b: board.map(Number).join(""), s: slots.map(s => s.map(Number).join("")), ex: isExample })); } catch (e) {}
+  clearTimeout(timer);
+  timer = setTimeout(run, 120);
+}
+function run() {
+  const pieces = slots.map(pieceFrom);
+  const list = pieces.map((p, idx) => (p ? { p, idx } : null)).filter(Boolean);
+  view = 0;
+  if (!list.length) { result = null; renderResults(); return; }
+  const r = solve(rowsOf(board), list);
+  result = { ...r, pieces, missing: 3 - list.length };
+  renderResults();
+}
+function loadExample() {
+  board = EXAMPLE_BOARD.join("").split("").map(ch => ch === "#");
+  slots = EXAMPLE_PIECES.map(g => gridToRaw(parse(g)));
+  active = 0; isExample = true;
+  renderBoard(); renderSlots(); changed();
+}
+
+document.getElementById("btnExample").addEventListener("click", loadExample);
+document.getElementById("btnClear").addEventListener("click", () => { board.fill(false); isExample = false; renderBoard(); changed(); });
+document.getElementById("btnClearPieces").addEventListener("click", () => { slots.forEach(s => s.fill(false)); active = 0; isExample = false; renderSlots(); changed(); });
+
+let restored = false;
+try {
+  const d = JSON.parse(localStorage.getItem(KEY));
+  if (d && d.b && d.b.length === 64 && Array.isArray(d.s) && d.s.length === 3) {
+    board = [...d.b].map(x => x === "1");
+    slots = d.s.map(s => [...s].map(x => x === "1"));
+    isExample = !!d.ex; restored = true;
+  }
+} catch (e) {}
+if (restored) { renderBoard(); renderSlots(); run(); } else loadExample();
+})();
+</script>
+</html>
