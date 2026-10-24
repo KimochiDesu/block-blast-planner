@@ -2,27 +2,25 @@
 
 Tap in your 8×8 Block Blast board and your three pieces. The planner shows the best order and spot for each piece, which lines it clears, and how the board looks after your turn.
 
-It's a single static page (`index.html`) with no build step.
+It's a single static page (`public/index.html`) with no build step.
 
 ## Run on Windows / any PC
 
 ```
+cd public
 python -m http.server 8080
 ```
 
-Then open http://localhost:8080. You can also just open `index.html` in a browser.
+Then open http://localhost:8080. You can also just open `public/index.html` in a browser.
 
-## Run on an Ubuntu server
+## Run on the Ubuntu server (Docker)
 
-```
-git clone <this repo> block-blast-planner
-cd block-blast-planner
-chmod +x deploy/install-ubuntu.sh
-./deploy/install-ubuntu.sh
-```
-
-This installs nginx and serves the page on port 8080. Use `PORT=80 ./deploy/install-ubuntu.sh` for a different port. To update later:
+From the project folder on the server:
 
 ```
-git pull && ./deploy/install-ubuntu.sh
+docker compose up -d
 ```
+
+The planner is served by nginx on port 8092: http://192.168.1.100:8092. Change the port in `compose.yaml` if needed.
+
+Page edits show up right away because `public/` is mounted into the container. Refresh the browser after replacing `public/index.html`; no restart is needed.
